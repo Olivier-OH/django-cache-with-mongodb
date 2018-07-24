@@ -1,0 +1,13 @@
+# IDE specific
+.vscode
+# file
+*.pyc
+**/__pycache__
+
+# dir
+build/
+dist/
+*.egg-info/
+logs/
+src/
+media/
