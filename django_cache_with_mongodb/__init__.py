@@ -4,6 +4,8 @@
 #  Alireza Savand <alireza.savand@gmail.com>, (c) 2013, 2014, 2015
 #  Olivier Hoareau <olivier.p.hoareau@gmail.com>, (c) 2018
 
+from __future__ import unicode_literals, print_function
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -124,7 +126,7 @@ class MongoDBCache(BaseCache):
                 upsert = True,
             )
         #TODO: check threadsafety!
-        except (OperationFailure, ExecutionTimeout), e:
+        except (OperationFailure, ExecutionTimeout):
             return False
         else:
             return True
