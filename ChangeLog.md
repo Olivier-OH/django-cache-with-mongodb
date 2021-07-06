@@ -1,3 +1,9 @@
+2021.07.06
+==========
+
+* Debugged `clear()` sometimes not working.
+* Made the code compatible with python 3.
+
 2018.07.24
 ==========
 

@@ -7,14 +7,15 @@ setup(
     package_dir={'django_cache_with_mongodb': 'django_cache_with_mongodb'},
     provides=['django_cache_with_mongodb'],
     include_package_data=True,
-    url='https://github.com/Olivier-OH/django_cache_with_mongodb',
-    license=open('LICENSE').read(),
+    url='https://github.com/Olivier-OH/django-cache-with-mongodb',
+    license='BSD-3-Clause',
     author='Olivier Hoareau',
     author_email='olivier.p.hoareau@gmail.com',
     maintainer='Olivier Hoareau',
     maintainer_email='olivier.p.hoareau@gmail.com',
     description='Provides caching ability through MongoDB. Forked and detached from django_mongodb_cash_backend.',
     long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
     install_requires=[
         'pymongo==3.*'
     ],
