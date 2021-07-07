@@ -10,7 +10,7 @@ Add the following to your Django settings::
 
     CACHES = {
         'default': {
-            'BACKEND': 'django_mongodb_cash_backend.MongoDBCache',
+            'BACKEND': 'django_cache_with_mongodb.MongoDBCache',
             "LOCATION": "hostname[:port]",
             "OPTIONS": {
                 "USERNAME": "username_if_desired",
