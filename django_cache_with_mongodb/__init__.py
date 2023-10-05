@@ -54,6 +54,7 @@ class MongoDBCache(BaseCache):
         BaseCache.__init__(self, params)
 
         self._host = "localhost:27017"
+        self._database = None
         self._collection_name = "django_cache"
         self._connection_options = {}
 
@@ -253,6 +254,37 @@ class MongoDBCache(BaseCache):
             )
             > 0
         )
+
+    @reconnect()
+    def incr(self, key, delta=1, version=None):
+        """
+        Add delta to value in the cache. If the key does not exist, raise a
+        ValueError exception.
+        """
+        now = timezone.now()
+        value = self.get(key, self._missing_key, version=version)
+        if value is self._missing_key:
+            raise ValueError("Key '%s' not found" % key)
+
+        new_value = value + delta
+
+        coll = self._get_collection()
+        key = self.make_key(key, version)
+        self.validate_key(key)
+
+        pickled = pickle.dumps(new_value, pickle.HIGHEST_PROTOCOL)
+        encoded = base64.encodebytes(pickled).strip()
+
+        try:
+            coll.update_one(
+                {"key": key},
+                {"$set": {"data": encoded, "last_change": now}},
+            )
+        # TODO: Add transactions for threadsafety!
+        except (OperationFailure, ExecutionTimeout):
+            return False
+
+        return new_value
 
     @reconnect()
     def clear(self):
