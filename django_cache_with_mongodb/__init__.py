@@ -287,6 +287,32 @@ class MongoDBCache(BaseCache):
         return new_value
 
     @reconnect()
+    def ttl(self, key, version=None):
+        """
+        Get TTL (Time-to-Live) of a key in seconds.
+        """
+        coll = self._get_collection()
+        key = self.make_key(key, version)
+        self.validate_key(key)
+        now = timezone.now()
+
+        data = coll.find_one(
+            {
+                "$and": [
+                    {"key": key},
+                    {"expires": {"$gt": now}},
+                ]
+            }
+        )
+        if not data:
+            return None
+
+        try:
+            return (data["expires"] - now).total_seconds()
+        except TypeError:
+            return None
+
+    @reconnect()
     def clear(self):
         coll = self._get_collection()
         collstats = self._db.command("collstats", self._collection_name)
