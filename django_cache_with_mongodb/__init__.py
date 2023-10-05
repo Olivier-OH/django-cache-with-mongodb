@@ -12,7 +12,7 @@ except ImportError:
     import pickle
 import base64
 import re
-from datetime import datetime, timedelta
+from datetime import timedelta
 import functools
 
 import pymongo
@@ -20,16 +20,6 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
 from django.core.cache.backends.base import BaseCache, DEFAULT_TIMEOUT
 from pymongo.errors import OperationFailure, ExecutionTimeout
-
-def get_host_and_port(location):
-    location = location or 'localhost:27017'
-    split_value = location.split(':')
-    if len(split_value) == 1:
-        return split_value[0], 27017
-    elif len(split_value) > 1:
-        return split_value[0], split_value[1]
-    else:
-        return None, None
 
 
 def reconnect(retries=3):
@@ -46,27 +36,60 @@ def reconnect(retries=3):
         return wrapper
     return _decorator
 
-    
 
 class MongoDBCache(BaseCache):
     def __init__(self, location, params):
         options = params.get('OPTIONS', {})
 
-        if not 'timeout' in params and not 'TIMEOUT' in params:
+        if 'timeout' not in params and 'TIMEOUT' not in params:
             params['TIMEOUT'] = None
-        if not 'max_entries' in params and not 'MAX_ENTRIES' in options:
-            options['MAX_ENTRIES'] = -1
-        
+        if 'max_entries' not in params and 'MAX_ENTRIES' not in options:
+            params['max_entries'] = -1
+
 
         BaseCache.__init__(self, params)
 
-        self._host, self._port = get_host_and_port(location)
-        
-        self._database = options.get('DATABASE', None)
-        self._username = options.get('USERNAME') or None
-        self._password = options.get('PASSWORD') or None
+        self._host = 'localhost:27017'
+        self._collection_name = 'django_cache'
+        self._connection_options = {}
 
-        self._collection_name = options.get('COLLECTION', None) or 'django_cache'
+        # update conf with mongo uri data, only if uri was given
+        if location:
+            url = location
+
+            if not url.startswith("mongodb://"):
+                url = "mongodb://" + url
+
+            uri_data = pymongo.uri_parser.parse_uri(url)
+            # build the hosts list to create a mongo connection
+            hosts_list = [
+                f'{x[0]}:{x[1]}' for x in uri_data['nodelist']
+            ]
+            self._username = uri_data['username']
+            self._password = uri_data['password']
+            self._host = hosts_list
+            if uri_data['database']:
+                # if no database is provided in the uri, use default
+                self._database = uri_data['database']
+
+            self._connection_options.update(uri_data['options'])
+
+        # update connection_options with specific settings
+        if options:
+            config = dict(options)  # don't modify original
+
+            self._username = config.pop('USERNAME', self._username)
+            self._password = config.pop('PASSWORD', self._password)
+            self._database = config.pop('DATABASE', self._database)
+            self._collection_name = config.pop('COLLECTION', 'django_cache')
+
+            self._connection_options.update(config)
+
+        self._connection_options['host'] = self._host
+        if self._username:
+            self._connection_options['username'] = self._username
+        if self._password:
+            self._connection_options['password'] = self._password
 
         if self._max_entries is not None and self._max_entries <= 0:
             self._max_entries = None
@@ -114,7 +137,7 @@ class MongoDBCache(BaseCache):
             expires = None
         coll = self._get_collection()
         pickled = pickle.dumps(value, pickle.HIGHEST_PROTOCOL)
-        encoded = base64.encodestring(pickled).strip()
+        encoded = base64.encodebytes(pickled).strip()
 
         if mode == 'add' and self.has_key(key):
             return False
@@ -153,7 +176,7 @@ class MongoDBCache(BaseCache):
         if not data:
             return default
 
-        unencoded = base64.decodestring(data['data'])
+        unencoded = base64.decodebytes(data['data'])
         unpickled = pickle.loads(unencoded)
 
         return unpickled
@@ -161,7 +184,6 @@ class MongoDBCache(BaseCache):
     @reconnect()
     def get_many(self, keys, version=None):
         coll = self._get_collection()
-        now = datetime.utcnow()
         out = {}
         parsed_keys = {}
         now = timezone.now()
@@ -175,7 +197,7 @@ class MongoDBCache(BaseCache):
             '$and':
                 [
                     {
-                        'key': {'$in': parsed_keys.keys()}
+                        'key': {'$in': list(parsed_keys.keys())}
                     },
                     {'$or': [
                         {'expires': {'$gt': now}},
@@ -185,7 +207,7 @@ class MongoDBCache(BaseCache):
             }
         )
         for result in data:
-            unencoded = base64.decodestring(result['data'])
+            unencoded = base64.decodebytes(result['data'])
             unpickled = pickle.loads(unencoded)
             out[parsed_keys[result['key']]] = unpickled
 
@@ -197,7 +219,7 @@ class MongoDBCache(BaseCache):
         self.validate_key(key)
         coll = self._get_collection()
         if not 'capped' in self._db.command("collstats", self._collection_name):
-            coll.remove({'key': key})
+            coll.delete_one({'key': key})
         else:
             coll.update_one({'key': key}, {'$set':{'expires':timezone.now()}})
 
@@ -208,7 +230,7 @@ class MongoDBCache(BaseCache):
         self.validate_key(key)
         now = timezone.now()
 
-        data = coll.find(
+        return coll.count_documents(
             {'$and':
                 [
                     {'key': key},
@@ -217,38 +239,33 @@ class MongoDBCache(BaseCache):
                         {'expires': None},
                     ]}
                 ]
-            }
-        )
-
-        return data.count() > 0
+            }, limit=1
+        ) > 0
 
     @reconnect()
     def clear(self):
         coll = self._get_collection()
         collstats = self._db.command("collstats", self._collection_name)
         if not 'capped' in collstats or not collstats['capped']:
-            coll.remove({})
+            coll.delete_many({})
         else:
-            coll.update({}, {'$set':{'expires':timezone.now()}})
+            coll.update_many({}, {'$set':{'expires':timezone.now()}})
 
     def _get_collection(self):
-        if not getattr(self, '_coll', None):
+        if getattr(self, '_coll', None) is None:
             self._initialize_collection()
 
         return self._coll
 
     def _initialize_collection(self):
-        if self._username is not None:
-            self.connection = pymongo.MongoClient('mongodb://{0}:{1}@{2}:{3}/{4}'.format(self._username, self._password, self._host, self._port, self._database))
-        else:
-            self.connection = pymongo.MongoClient('mongodb://{0}:{1}/'.format(self._host, self._port))
+        self.connection = pymongo.MongoClient(**self._connection_options)
         self._db = self.connection[self._database]
-        if self._collection_name not in self._db.collection_names():
+        if self._collection_name not in self._db.list_collection_names():
             options = {}
             if self._max_entries is not None:
                 # Create a capped collection
                 options.update({'capped':True, 'size':self._max_entries})
-            
+
             self._db.create_collection(self._collection_name, **options)
             collection = self._db[self._collection_name]
 
@@ -258,7 +275,7 @@ class MongoDBCache(BaseCache):
                     [("expires", pymongo.DESCENDING),],
                     expireAfterSeconds = 0,
                 )
-            
+
             # Create an index on "key"/"expires" fields
             collection.create_index([('key', pymongo.ASCENDING),('expires', pymongo.ASCENDING),])
 
