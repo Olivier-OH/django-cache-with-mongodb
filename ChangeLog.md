@@ -1,6 +1,15 @@
 Change log
 ==========
 
+2023.10.4
+--------
+
+* Minimal `pymongo` version bumped to 4.0.2
+* Deprecated MongoDB methods updated
+* Added support for MongoDB URI
+* Added `cache.ttl(key)` method
+* Updated `cache.incr(key)` method - does not update `expire` field anymore
+
 2021.7.8
 --------
 
