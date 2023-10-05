@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='django-cache-with-mongodb',
-    version='2021.7.8',
+    version='2023.10.4',
     packages=['django_cache_with_mongodb'],
     package_dir={'django_cache_with_mongodb': 'django_cache_with_mongodb'},
     provides=['django_cache_with_mongodb'],
@@ -17,7 +17,7 @@ setup(
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     install_requires=[
-        'pymongo==3.*'
+        'pymongo==4.*'
     ],
     keywords=[
         'django',
