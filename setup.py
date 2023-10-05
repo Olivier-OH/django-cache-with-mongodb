@@ -17,7 +17,7 @@ setup(
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     install_requires=[
-        'pymongo==4.*'
+        'pymongo>=4.0.2'
     ],
     keywords=[
         'django',
