@@ -17,6 +17,7 @@ import re
 from datetime import timedelta
 
 import pymongo
+from django.conf import settings
 from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
 from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
@@ -57,6 +58,7 @@ class MongoDBCache(BaseCache):
         self._database = None
         self._collection_name = "django_cache"
         self._connection_options = {}
+        self._tz_aware = getattr(settings, "USE_TZ", False)
 
         # update conf with mongo uri data, only if uri was given
         if location:
@@ -89,6 +91,7 @@ class MongoDBCache(BaseCache):
             self._connection_options.update(config)
 
         self._connection_options["host"] = self._host
+        self._connection_options["tz_aware"] = self._tz_aware
         if self._username:
             self._connection_options["username"] = self._username
         if self._password:
