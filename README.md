@@ -16,7 +16,7 @@ Add the following to your Django settings::
                 "USERNAME": "username_if_desired",
                 "PASSWORD": "password_if_needed",
                 "DATABASE": "cache_db_name",  # in not supplied in URI
-                "COLLECTION": "cache_colleciton",  # default: django_cache
+                "COLLECTION": "cache_collection",  # default: django_cache
                 # Any Connection Options supported by pymongo
             },
             "TIMEOUT": 86400, # either set TIMEOUT or MAX_ENTRIES, not both
