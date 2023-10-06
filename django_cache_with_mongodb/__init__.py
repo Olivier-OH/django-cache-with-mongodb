@@ -3,6 +3,7 @@
 #  Karol Sikora <karol.sikora@laboratorium.ee>, (c) 2012
 #  Alireza Savand <alireza.savand@gmail.com>, (c) 2013, 2014, 2015
 #  Olivier Hoareau <olivier.p.hoareau@gmail.com>, (c) 2018
+#  Sergey Romanyuk (https://github.com/romanukes), (c) 2023
 
 from __future__ import print_function, unicode_literals
 
