@@ -1,6 +1,8 @@
 ``django-cache-with-mongodb`` was forked _and detached_ from the [original creation](https://github.com/Alir3z4/django-mongodb-cash-backend) of Karol Sikora.
 
-Updated and reworked by: Olivier Hoareau <olivier.p.hoareau@ubisoft.com>
+Updated and reworked by:
+ - Olivier Hoareau <olivier.p.hoareau@ubisoft.com>
+ - Sergey Romanyuk
 
 ________
 
