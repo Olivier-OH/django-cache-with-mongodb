@@ -17,6 +17,7 @@ import functools
 import re
 from datetime import timedelta
 
+import bson
 import pymongo
 from django.conf import settings
 from django.core.cache.backends.base import DEFAULT_TIMEOUT, BaseCache
@@ -57,6 +58,8 @@ class MongoDBCache(BaseCache):
 
         self._host = "localhost:27017"
         self._database = None
+        self._username = None
+        self._password = None
         self._collection_name = "django_cache"
         self._connection_options = {}
         self._tz_aware = getattr(settings, "USE_TZ", False)
@@ -146,23 +149,39 @@ class MongoDBCache(BaseCache):
         else:
             expires = None
         coll = self._get_collection()
-        pickled = pickle.dumps(value, pickle.HIGHEST_PROTOCOL)
-        encoded = base64.encodebytes(pickled).strip()
 
         if mode == "add" and self.has_key(key):
             return False
 
         try:
-            coll.update_one(
-                {"key": key},
-                {"$set": {"data": encoded, "expires": expires, "last_change": now}},
-                upsert=True,
-            )
-        # TODO: check threadsafety!
+            try:
+                coll.update_one(
+                    {"key": key},
+                    {
+                        "$set": {"data": value, "expires": expires, "last_change": now},
+                        "$unset": {"encoded_data": ""},
+                    },
+                    upsert=True,
+                )
+            except bson.errors.InvalidDocument:
+                pickled = pickle.dumps(value, pickle.HIGHEST_PROTOCOL)
+                encoded = base64.encodebytes(pickled).strip()
+                coll.update_one(
+                    {"key": key},
+                    {
+                        "$set": {
+                            "encoded_data": encoded,
+                            "expires": expires,
+                            "last_change": now,
+                        },
+                        "$unset": {"data": ""},
+                    },
+                    upsert=True,
+                )
         except (OperationFailure, ExecutionTimeout):
             return False
-        else:
-            return True
+
+        return True
 
     @reconnect()
     def get(self, key, default=None, version=None):
@@ -187,10 +206,12 @@ class MongoDBCache(BaseCache):
         if not data:
             return default
 
-        unencoded = base64.decodebytes(data["data"])
-        unpickled = pickle.loads(unencoded)
+        if "encoded_data" in data:
+            unencoded = base64.decodebytes(data["encoded_data"])
+            unpickled = pickle.loads(unencoded)
+            return unpickled
 
-        return unpickled
+        return data["data"]
 
     @reconnect()
     def get_many(self, keys, version=None):
@@ -218,9 +239,12 @@ class MongoDBCache(BaseCache):
             }
         )
         for result in data:
-            unencoded = base64.decodebytes(result["data"])
-            unpickled = pickle.loads(unencoded)
-            out[parsed_keys[result["key"]]] = unpickled
+            if "encoded_data" in result:
+                unencoded = base64.decodebytes(result["encoded_data"])
+                unpickled = pickle.loads(unencoded)
+                out[parsed_keys[result["key"]]] = unpickled
+            else:
+                out[parsed_keys[result["key"]]] = result["data"]
 
         return out
 
@@ -266,29 +290,24 @@ class MongoDBCache(BaseCache):
         ValueError exception.
         """
         now = timezone.now()
-        value = self.get(key, self._missing_key, version=version)
-        if value is self._missing_key:
-            raise ValueError("Key '%s' not found" % key)
-
-        new_value = value + delta
-
         coll = self._get_collection()
         key = self.make_key(key, version)
         self.validate_key(key)
 
-        pickled = pickle.dumps(new_value, pickle.HIGHEST_PROTOCOL)
-        encoded = base64.encodebytes(pickled).strip()
-
         try:
-            coll.update_one(
+            new_document = coll.find_one_and_update(
                 {"key": key},
-                {"$set": {"data": encoded, "last_change": now}},
+                {
+                    "$inc": {"data": delta},
+                    "$set": {"last_change": now},
+                },
+                return_document=pymongo.ReturnDocument.AFTER,
             )
-        # TODO: Add transactions for threadsafety!
+            if new_document in None:
+                raise ValueError("Key %r not found" % key)
+            return new_document["data"]
         except (OperationFailure, ExecutionTimeout):
             return False
-
-        return new_value
 
     @reconnect()
     def ttl(self, key, version=None):
