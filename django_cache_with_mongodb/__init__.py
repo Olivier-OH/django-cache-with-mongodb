@@ -158,8 +158,8 @@ class MongoDBCache(BaseCache):
                 coll.update_one(
                     {"key": key},
                     {
-                        "$set": {"data": value, "expires": expires, "last_change": now},
-                        "$unset": {"encoded_data": ""},
+                        "$set": {"data_raw": value, "expires": expires, "last_change": now},
+                        "$unset": {"data": ""},
                     },
                     upsert=True,
                 )
@@ -170,11 +170,11 @@ class MongoDBCache(BaseCache):
                     {"key": key},
                     {
                         "$set": {
-                            "encoded_data": encoded,
+                            "data": encoded,
                             "expires": expires,
                             "last_change": now,
                         },
-                        "$unset": {"data": ""},
+                        "$unset": {"data_raw": ""},
                     },
                     upsert=True,
                 )
@@ -206,12 +206,12 @@ class MongoDBCache(BaseCache):
         if not data:
             return default
 
-        if "encoded_data" in data:
-            unencoded = base64.decodebytes(data["encoded_data"])
+        if "data" in data:
+            unencoded = base64.decodebytes(data["data"])
             unpickled = pickle.loads(unencoded)
             return unpickled
 
-        return data["data"]
+        return data["data_raw"]
 
     @reconnect()
     def get_many(self, keys, version=None):
@@ -240,11 +240,11 @@ class MongoDBCache(BaseCache):
         )
         for result in data:
             if "encoded_data" in result:
-                unencoded = base64.decodebytes(result["encoded_data"])
+                unencoded = base64.decodebytes(result["data"])
                 unpickled = pickle.loads(unencoded)
                 out[parsed_keys[result["key"]]] = unpickled
             else:
-                out[parsed_keys[result["key"]]] = result["data"]
+                out[parsed_keys[result["key"]]] = result["data_raw"]
 
         return out
 
@@ -298,14 +298,14 @@ class MongoDBCache(BaseCache):
             new_document = coll.find_one_and_update(
                 {"key": key},
                 {
-                    "$inc": {"data": delta},
+                    "$inc": {"data_raw": delta},
                     "$set": {"last_change": now},
                 },
                 return_document=pymongo.ReturnDocument.AFTER,
             )
             if new_document in None:
                 raise ValueError("Key %r not found" % key)
-            return new_document["data"]
+            return new_document["data_raw"]
         except (OperationFailure, ExecutionTimeout):
             return False
 
