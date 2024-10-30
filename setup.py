@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='django-cache-with-mongodb',
-    version='2023.10.4',
+    version='2024.10.31',
     packages=['django_cache_with_mongodb'],
     package_dir={'django_cache_with_mongodb': 'django_cache_with_mongodb'},
     provides=['django_cache_with_mongodb'],
