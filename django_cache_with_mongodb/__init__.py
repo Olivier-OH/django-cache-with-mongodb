@@ -239,7 +239,7 @@ class MongoDBCache(BaseCache):
             }
         )
         for result in data:
-            if "encoded_data" in result:
+            if "data" in result:
                 unencoded = base64.decodebytes(result["data"])
                 unpickled = pickle.loads(unencoded)
                 out[parsed_keys[result["key"]]] = unpickled
