@@ -1,6 +1,12 @@
 Change log
 ==========
 
+2024.10.31
+--------
+
+* Added support for raw data - all [BSON](https://www.mongodb.com/docs/manual/reference/bson-types/) compatible data stored in Mongo unpickled
+* **BREAKING**: Updated `cache.incr(key)` method - only works with raw data ([BSON Types](https://www.mongodb.com/docs/manual/reference/bson-types/))
+
 2023.10.4
 --------
 
