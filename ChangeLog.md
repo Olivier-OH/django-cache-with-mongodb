@@ -1,6 +1,11 @@
 Change log
 ==========
 
+2024.11.27
+--------
+
+* Updated usage of `collstats` to `collStats` for better support with MongoDB compatible databases
+
 2024.10.31
 --------
 
