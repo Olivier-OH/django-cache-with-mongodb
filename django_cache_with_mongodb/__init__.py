@@ -253,7 +253,7 @@ class MongoDBCache(BaseCache):
         key = self.make_key(key, version)
         self.validate_key(key)
         coll = self._get_collection()
-        if not "capped" in self._db.command("collstats", self._collection_name):
+        if not "capped" in self._db.command("collStats", self._collection_name):
             coll.delete_one({"key": key})
         else:
             coll.update_one({"key": key}, {"$set": {"expires": timezone.now()}})
@@ -338,7 +338,7 @@ class MongoDBCache(BaseCache):
     @reconnect()
     def clear(self):
         coll = self._get_collection()
-        collstats = self._db.command("collstats", self._collection_name)
+        collstats = self._db.command("collStats", self._collection_name)
         if not "capped" in collstats or not collstats["capped"]:
             coll.delete_many({})
         else:
